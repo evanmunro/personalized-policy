@@ -1,81 +1,101 @@
-using Random, Combinatorics, Distributions, StatsBase
+using Distributions, Random, JuMP, Ipopt
+using LinearAlgebra
+using Suppressor
 
-struct Covariates
-    d1::Array{Float64}
-    d0::Array{Float64}
-    cost::Array{Float64}
-    d::Int
+struct ExperimentData
+    y::Array{Float64}
+    x
+    ξ
 end
 
-function Covariates(d::Int64)::Covariates
-    dcost = Normal(d)
-    cost = abs.(rand(dcost,d))
-    db = Beta(1)
-    dHigh = zeros(d)
-    dLow = zeros(d)
-    for i in 1:d
-        ds = rand(db,2)
-        dHigh[i] = maximum(ds)
-        dLow[i] = minimum(ds)
-    end
-    return Covariates(dHigh,dLow,cost,d)
+function frankel_generator(β, ξ)
+    n, d = size(ξ)
+    β = β[2:(d+1)]
+    γ = rand(Uniform(0, 8), n)
+    m = 1
+    z = rand(Normal(), (n, d))
+    e = rand(Normal(), n)
+    x = z .+ m.*γ.*(ξ.+β')
+    y = z*ones(d) .+ e
+    return ExperimentData(y, x, ξ)
 end
 
-function manipulation_benefit()
-    return 0
+function mock_survey_coder(β, ξ, recode, n)
+    m = length(recode)
+    γ = rand(Uniform(0, 8), n)
+    z = rand(1:m, n)
+    x = Int.(floor.(z .+ γ.*(ξ.+β)))
+    x[x.>m] .= m
+    x[x .< m] .=1
+    x = recode[x]
+    z = recode[z]
+    return z, x
 end
 
-function sampleX(d1::Array{Float64})
-    x = zeros(length(d1))
-    for i in 1:length(d1)
-        x[i]= sample([0,1],ProbabilityWeights([1-d1[i],d1[i]]))
-    end
-    return x
+function survey_generator(β, ξ)
+    n, d = size(ξ)
+    β = β[2:(d+1)]
+    z1, x1 = mock_survey_coder(β[1], ξ[:,1], [21.0, 29.0, 39.0, 49.0, 59.0, 69.0, 79.0, 85.0], n)
+    z2, x2 = mock_survey_coder(β[2], ξ[:,2], [10, 12, 13, 14, 16, 18, 20], n)
+    z3, x3 = mock_survey_coder(β[3], ξ[:,3], [0, 1], n)
+    #y = floor.((10.0 .+ [z1 z2 z3]*[0.1, 0.12, 10.0])/10.0)*10
+    y = 10.0 .+ [z1 z2 z3]*[0.1, 0.12, 10.0]
+    return ExperimentData(y, [x1 x2 x3], ξ)
 end
 
-function sampleX(distNull::Covariates, model,benefit=10)
-    d1 = distNull.d0
-    manip = 0
-    # true x's
-    x = zeros(length(d1))
-    for i in 1:length(d1)
-        x[i]= sample([0,1],ProbabilityWeights([1-d1[i],d1[i]]))
-    end
-
-    # manipulated
-    for i in 1:length(d1)
-        deriv = coef(model)[i+1]
-        if x[i] == 0
-            if benefit*deriv > distNull.cost[i]
-                x[i] = 1
-                manip = 1
-            end
-        end
-    end
-    return x,manip
+function update_β_ols(data::ExperimentData, β, α=0)
+    β_n = linReg(data.y, data.x)
+    return β_n
 end
 
-function generate_sample(N::Int64,distNull::Covariates,mProb=0,model=Nothing,fracH=0.3)
-    outcomeProb = ProbabilityWeights([1-fracH, fracH])
-    d = distNull.d
-    y = zeros(N)
-    x = zeros(N,d)
-    manipulators = 0
-    for i in 1:N
-        y[i] = sample([0,1],outcomeProb)
-        if y[i] == 1
-            # high types don't manipulate, they choose X normally
-            x[i,:] = sampleX(distNull.d1)
-        else
-            # low types might manipulate, take that into account
-            knows = sample([0,1],ProbabilityWeights([1-mProb,mProb]))
-            if (model == Nothing) || knows== 0
-                x[i,:] = sampleX(distNull.d0)
-            else
-                x[i,:],manip = sampleX(distNull,model)
-                manipulators += manip
-            end
-        end
+function mse(data, β)
+    return mean((data.y .- [ones(length(data.y)) data.x]*β).^2)
+end
+
+function update_β_robust(data::ExperimentData, β, α=[0.5, 0.00001, 0.0001, 0.1])
+    n, d = size(data.ξ)
+    yhat = β[1] .+ sum((data.ξ .+ β[2:(d+1)]').*data.x, dims=2)
+    ehat = data.y .- yhat
+    dβ = [-2/n*sum((data.y .- yhat)), linReg(ehat.^2, data.ξ)[2:(d+1)]...]
+    β_n = β .- α.*dβ
+    return β_n
+end
+
+function run_simulation(generator, updater, β0::Array{Float64, 1}, n::Int, steps::Int)
+    d = length(β0) - 1
+    β_history = zeros(Float64, (steps, d+1))
+    mse_history = zeros(Float64, steps)
+    β_history[1, :] = β0
+    for s in 2:steps
+        η = β_history[s-1, 2:(d+1)]
+        ξ = rand([-1,1], (n, d)).*η'
+        data = generator(β_history[s-1, :], ξ)
+        mse_history[s-1] = mse(data, β_history[s-1, :])
+        β_history[s, :] = updater(data, β_history[s-1, :])
     end
-    return x,y, manipulators
+
+    mse_history[steps] = mse_history[steps-1]
+    return β_history, mse_history
+end
+
+
+function true_Frankel_estimate(n=10000)
+    γ = rand([0, 0.5, 8], n)
+    z = rand(Normal(), n)
+    e = rand(Normal(0, 0.5), n)
+    y = z .+ e
+    model =  Model(Ipopt.Optimizer)
+    @variable(model, b1)
+    @variable(model, b0)
+    @NLobjective(model, Min, 1/n*sum((y[i] - b1*(z[i]+γ[i]*b1)-b0)^2 for i in 1:n))
+    @suppress_out begin
+        optimize!(model)
+    end
+    return [value(b0) value(b1)]
+end
+
+function linReg(y, x)
+    x = [ones(length(y)) x ]
+    β = inv(x'*x)*x'*y
+    return β
 end
