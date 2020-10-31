@@ -52,12 +52,16 @@ function mse(data, β)
     return mean((data.y .- [ones(length(data.y)) data.x]*β).^2)
 end
 
-function update_β_robust(data::ExperimentData, β, α=[0.5, 0.00001, 0.0001, 0.1])
+#20000, 100, 4
+function update_β_robust(data::ExperimentData, β, α=[0.5, 1/80000.0, 1/150.0, 1/3.0])
     n, d = size(data.ξ)
     yhat = β[1] .+ sum((data.ξ .+ β[2:(d+1)]').*data.x, dims=2)
+
     ehat = data.y .- yhat
     dβ = [-2/n*sum((data.y .- yhat)), linReg(ehat.^2, data.ξ)[2:(d+1)]...]
+    println(dβ)
     β_n = β .- α.*dβ
+    β_n[1] = mean(data.y)  - mean(sum(β_n[2:(d+1)]'.*data.x, dims=2))
     return β_n
 end
 
@@ -79,7 +83,17 @@ function run_simulation(generator, updater, β0::Array{Float64, 1}, n::Int, step
 end
 
 
-function true_Frankel_estimate(n=10000)
+
+
+res = Optim.optimize(beta -> calc_loss(beta, model, y, z, gamma),
+                                        zeros(Float32, k))
+bstar = Optim.minimizer(res)
+
+
+function pxDGP()
+
+end
+function fk_solution()
     γ = rand([0, 0.5, 8], n)
     z = rand(Normal(), n)
     e = rand(Normal(0, 0.5), n)
