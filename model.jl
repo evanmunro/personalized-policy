@@ -82,17 +82,6 @@ function run_simulation(generator, updater, β0::Array{Float64, 1}, n::Int, step
     return β_history, mse_history
 end
 
-
-
-
-res = Optim.optimize(beta -> calc_loss(beta, model, y, z, gamma),
-                                        zeros(Float32, k))
-bstar = Optim.minimizer(res)
-
-
-function pxDGP()
-
-end
 function fk_solution()
     γ = rand([0, 0.5, 8], n)
     z = rand(Normal(), n)
