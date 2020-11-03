@@ -126,7 +126,7 @@ function runPxExperiment(T)
         println(m.β[T, :])
     end
     plot( βs, xlabel = "t", ylabel="Price Discrimination",
-    label=["Fixed: Full Knowledge" "Learning via Experiment" "Naive Iterative" "Fixed: Assume No Manipulation"], ylim = [0.0, 0.8])
+    label=["Full Knowledge" "Learning via Experiment" "Repeated Risk Min" "Naive Risk Min"], ylim = [0.0, 0.8])
 end
 
 function runExperiment(tuner::ExperimentTuner, methods::Array{IterativeUpdater})
