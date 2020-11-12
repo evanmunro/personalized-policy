@@ -21,4 +21,4 @@ Runs the simulation and generates the figure and data for Table 2 and Figure 2.
 ``` 
 julia experiment_figure.jl
 ``` 
-Runs the simulation and generates the figure and data for Table 3 and Figure 3. 
+Loads the experiment data and generates the figure and data for Table 3 and Figure 3. 
