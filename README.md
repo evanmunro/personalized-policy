@@ -2,6 +2,14 @@
 
 This repository contains Julia code for the simulation and empirical sections of my paper. The latest working paper version is [available here]() on ArXiv. 
 
+The Julia package dependencies for the project are as follows: 
+
+```
+dependencies = ["Plots", "Random", "Distributions", "Optim", "RollingFunctions" ] 
+```
+
+They can be installed via `Pkg.add(dependencies)` 
+
 ```
 julia sc_figure.jl
 ``` 
