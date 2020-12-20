@@ -1,58 +1,11 @@
 using Random, Distributions, Optim, Plots, RollingFunctions
+include("simulation_utils.jl")
 
-function broadcastArray(β::Array{Float64}, n)
-    if ndims(β)== 1
-        β  = zeros(n, 2) .+ transpose(β)
-    end
-    return β
-end
-struct PxTypeData
+struct PxTypeData <: TypeData
     v::Array{Float64}
     γ::Array{Float64}
     z::Array{Float64}
 end
-
-struct ObservedData
-    x::Array{Float64}
-    w::Array{Float64}
-    y::Array{Float64}
-end
-
-struct ExperimentTuner
-    T::Int
-    n::Int
-    ξ::Float64
-    α::Array{Float64}
-    β₀::Array{Float64}
-end
-
-mutable struct IterativeUpdater
-    update::Function
-    β::Array{Float64, 2}
-    π::Array{Float64, 1}
-end
-
-function IterativeUpdater(update::Function, tuner::ExperimentTuner)
-    k = length(tuner.β₀)
-    β = zeros(Float64, (tuner.T, k))
-    π = zeros(Float64, tuner.T)
-    IterativeUpdater(update, β, π)
-end
-
-function IterativeUpdater(βfixed::Array{Float64}, tuner::ExperimentTuner)
-    k = length(tuner.β₀)
-    β = zeros(Float64, (tuner.T, k))
-    π = zeros(Float64, tuner.T)
-    function fixedβ(a, types::PxTypeData, t, tuner::ExperimentTuner)
-        return βfixed
-    end
-    IterativeUpdater(fixedβ, β, π)
-end
-
-function ExperimentTuner(T, n)
-    return ExperimentTuner(T, n, 0.2, [8e-2, 5e-4], [5.0, 0.25])
-end
-
 
 function PxTypeData(n=1000)
     z = rand(Uniform(10, 20), n)
@@ -106,14 +59,14 @@ end
 
 function runPxExperiment(T)
     n = 5000
-    β_fk = fk_solution(100000)
-    β_naive = naive_solution(100000)
-    tuner = ExperimentTuner(T, n)
+    β_fk = fk_solution(100000, PxTypeData, fixedXObjective)
+    β_naive = naive_solution(100000, PxTypeData, negRevenue)
+    tuner = ExperimentTuner(T, n, 0.2, [8e-2, 5e-4], [5.0, 0.25])
     methods = [IterativeUpdater(β_fk, tuner),
                IterativeUpdater(robustUpdate, tuner),
                IterativeUpdater(naiveUpdate, tuner),
                IterativeUpdater(β_naive, tuner)]
-    runExperiment(tuner, methods)
+    runExperiment(tuner, methods, PxTypeData, revenue)
     βs = []
     fk_profits = mean(methods[1].π)
     println(methods[4].π[20:30])
@@ -126,42 +79,7 @@ function runPxExperiment(T)
         println(m.β[T, :])
     end
     plot( βs, xlabel = "t", ylabel="Price Discrimination",
-    label=["Full Knowledge" "Learning via Experiment" "Repeated Risk Min" "Naive Risk Min"], ylim = [0.0, 0.8])
-end
-
-function runExperiment(tuner::ExperimentTuner, methods::Array{IterativeUpdater})
-    types = PxTypeData(tuner.n)
-    for m in methods
-        m.β[1, :] = m.update(tuner.β₀, types, 1, tuner)
-        m.π[1] = mean(revenue(m.β[1, :], types))
-    end
-    for t in 2:tuner.T
-        types = PxTypeData(tuner.n)
-        for m in methods
-            m.β[t, :] = m.update(m.β[t-1, :], types, t, tuner)
-            m.π[t] = mean(revenue(m.β[t, :], types))
-        end
-    end
-end
-
-function naive_solution(n)
-    types = PxTypeData(n)
-    res = Optim.optimize(beta -> fixedXObjective(beta, types.z, types), [1, 0.0])
-    return Optim.minimizer(res)
-end
-
-function fk_solution(n)
-    types = PxTypeData(n)
-    res = Optim.optimize(beta -> negRevenue(beta, types), [1, 0.0])
-    bstar = Optim.minimizer(res)
-    return bstar
-end
-
-#utilities and tests
-function linReg(y, x)
-    x = [ones(length(y)) x ]
-    β = inv(x'*x)*x'*y
-    return β
+    label=["Full Information" "Learning via Experiment" "Repeated Risk Min" "Naive Risk Min"], ylim = [0.0, 0.8])
 end
 
 function test_analytic_x()

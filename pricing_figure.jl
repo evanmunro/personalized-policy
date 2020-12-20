@@ -1,4 +1,4 @@
-includet("pricing_simulations.jl")
+includet("pricing_model.jl")
 
 βstar = fk_solution()
 types = PxTypeData()
