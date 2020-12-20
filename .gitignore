@@ -1,5 +1,6 @@
 .ipynb_*
 figures/*
-data/*
+data/raw/not used/*
 .DS_Store
 write/*
+*.xls
