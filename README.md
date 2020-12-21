@@ -1,6 +1,6 @@
 #### Policy Learning with Strategic Agents
 
-This repository contains Julia code for the simulation and empirical sections of my paper. The latest working paper version is [available here]() on ArXiv.
+This repository contains Julia code for the simulation and empirical sections of my paper. The latest working paper version is [available here](https://arxiv.org/abs/2011.06528) on ArXiv.
 
 The Julia package dependencies for the project are as follows:
 
