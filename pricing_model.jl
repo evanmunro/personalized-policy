@@ -1,5 +1,5 @@
-using Random, Distributions, Optim, Plots, RollingFunctions
-include("simulation_utils.jl")
+using Random, Distributions, Optim, Plots
+include("simulation_model.jl")
 
 struct PxTypeData <: TypeData
     v::Array{Float64}
@@ -59,9 +59,9 @@ end
 
 function runPxExperiment(T)
     n = 5000
-    β_fk = fk_solution(100000, PxTypeData, fixedXObjective)
-    β_naive = naive_solution(100000, PxTypeData, negRevenue)
-    tuner = ExperimentTuner(T, n, 0.2, [8e-2, 5e-4], [5.0, 0.25])
+    β_fk = fk_solution(100000, PxTypeData, negRevenue)
+    β_naive = naive_solution(100000, PxTypeData, fixedXObjective)
+    tuner = ExperimentTuner(T, n, 0.2, [8e-2, 5e-4], [5.0, 0.4])
     methods = [IterativeUpdater(β_fk, tuner),
                IterativeUpdater(robustUpdate, tuner),
                IterativeUpdater(naiveUpdate, tuner),
@@ -69,17 +69,19 @@ function runPxExperiment(T)
     runExperiment(tuner, methods, PxTypeData, revenue)
     βs = []
     fk_profits = mean(methods[1].π)
-    println(methods[4].π[20:30])
-    println(methods[3].π[20:30])
+    plotmethods = [methods[1], methods[2], methods[4]]
     for m in methods
-        push!(βs, rollmean(m.β[:, 2], 2))
+        if m in plotmethods
+            push!(βs, mean(m.β[:, 2], dims=2))
+        end
         println(mean(m.π))
         println(mean(m.π) - fk_profits)
         #push!(βs, m.β[:, 2])
         println(m.β[T, :])
     end
     plot( βs, xlabel = "t", ylabel="Price Discrimination",
-    label=["Full Information" "Learning via Experiment" "Repeated Risk Min" "Naive Risk Min"], ylim = [0.0, 0.8])
+    label=["Full Information" "Learning via Experiment"  "Naive Risk Min"], ylim = [0.0, 0.8])
+    savefig("figures/price_sim.pdf")
 end
 
 function test_analytic_x()

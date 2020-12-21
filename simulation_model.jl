@@ -1,4 +1,4 @@
-using Random, Distributions, Optim, Plots, RollingFunctions
+using Random, Distributions, Optim, Plots, Statistics
 
 abstract type TypeData end
 
@@ -153,11 +153,11 @@ function naiveUpdate(β::Array{Float64}, types::SCTypeData, t::Int, tuner::Exper
 end
 
 function runSCExperiment(T)
-    n = 1000
+    n = 5000
     β_fk = fk_solution(100000, SCTypeData, negloss)
 
     β_naive = naive_solution(100000, SCTypeData, fixedXObjective)
-    tuner = ExperimentTuner(T, n, 0.075, [3e-3], [-0.5, 0.95])
+    tuner = ExperimentTuner(T, n, 0.075, [3e-3], [-0.5, 0.87])
     methods = [IterativeUpdater(β_fk, tuner),
                IterativeUpdater(SCUpdate, tuner),
                IterativeUpdater(naiveUpdate, tuner),
@@ -165,8 +165,9 @@ function runSCExperiment(T)
     runExperiment(tuner, methods, SCTypeData, loss)
     βs = []
     fk_profits = mean(methods[1].π)
+
     for m in methods
-        push!(βs, rollmean(m.β[:, 2], 2))
+        push!(βs, mean(m.β[:, 2], dims=2))
         #print regret
         println(mean(m.π))
         println(mean(m.π) - fk_profits)
@@ -174,4 +175,5 @@ function runSCExperiment(T)
     end
     plot( βs, xlabel = "t", ylabel="Prediction Weight",
     label=["Full Information" "Learning via Experiment" "Repeated Risk Min" "Naive Risk Min"], ylim = [0.7, 1.2])
+    savefig("figures/sc_sim.pdf")
 end

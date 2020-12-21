@@ -1,5 +1,5 @@
 using CategoricalArrays, DataFrames
-include("model.jl")
+include("experiment_model.jl")
 
 function summarize_data(datapath)
     data = DataFrame!(CSV.File(datapath))

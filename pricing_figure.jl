@@ -1,6 +1,4 @@
-includet("pricing_model.jl")
+include("pricing_model.jl")
 
-βstar = fk_solution()
-types = PxTypeData()
-data  = ObservedData(types, βstar)
-sum(data.y .==0)
+Random.seed!(1)
+runPxExperiment(500)
