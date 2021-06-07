@@ -4,3 +4,4 @@ data/raw/not used/*
 .DS_Store
 write/*
 *.xls
+data/*

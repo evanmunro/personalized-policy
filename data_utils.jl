@@ -67,7 +67,7 @@ function o_mse_calc(files, beta)
         x = Matrix([ones(size(data)[1]) data[!, ["Q2", "Q3", "Q4"]]])
         y = data.Q1
         yhat = x*beta
-        mses[i] = mean((yhat .- y).^2)
+        mses[i] =  1 - mean((yhat .- y).^2)/var(y)
         n[i] = length(yhat)
     end
     println(mses)

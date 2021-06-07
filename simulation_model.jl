@@ -93,7 +93,8 @@ end
 function SCTypeData(n=1000)
     z = rand(Normal(0, 1), n)
     r = rand(Normal(0, 1), n)
-    γ = rand(Uniform(0, 1.5), n)
+    #used to be 1.5
+    γ = rand(Uniform(0, 3), n)
     return SCTypeData(γ, z, r)
 end
 
@@ -118,7 +119,7 @@ function loss(β::Array{Float64}, types::SCTypeData)
 end
 
 function SCUpdate(β, types::SCTypeData, t, tuner::ExperimentTuner)
-    step = tuner.α[1]/2
+    step = tuner.α[1]/(2)
     ϵ = [ zeros(tuner.n) tuner.ξ.*rand([-1,1], (tuner.n, length(β)-1))]
     βp = β' .+ ϵ
     data = ObservedData(types, βp)
@@ -157,7 +158,8 @@ function runSCExperiment(T)
     β_fk = fk_solution(100000, SCTypeData, negloss)
 
     β_naive = naive_solution(100000, SCTypeData, fixedXObjective)
-    tuner = ExperimentTuner(T, n, 0.075, [3e-3], [-0.5, 0.87])
+    #tuner = ExperimentTuner(T, n, 0.035, [3e-3], [-0.65, 0.75])
+    tuner = ExperimentTuner(T, n, 0.075, [3e-3], [-0.65, 0.75])
     methods = [IterativeUpdater(β_fk, tuner),
                IterativeUpdater(SCUpdate, tuner),
                IterativeUpdater(naiveUpdate, tuner),
@@ -174,6 +176,6 @@ function runSCExperiment(T)
         println(m.β[T, :])
     end
     plot( βs, xlabel = "t", ylabel="Prediction Weight",
-    label=["Full Information" "Learning via Experiment" "Repeated Risk Min" "Naive Risk Min"], ylim = [0.7, 1.2])
+    label=["Full Information" "Learning via Experiment" "Repeated Risk Min" "Naive Risk Min"], ylim = [0.5, 1.2])
     savefig("figures/sc_sim.pdf")
 end
